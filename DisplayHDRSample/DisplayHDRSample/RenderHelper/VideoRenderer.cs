@@ -6,15 +6,12 @@ using Microsoft.UI.Xaml;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Numerics;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Media;
-using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.Storage;
 using Windows.Storage.Pickers;
-using Windows.Storage.Streams;
 
 namespace DisplayHDRSample.RenderHelper
 {
@@ -98,45 +95,6 @@ namespace DisplayHDRSample.RenderHelper
                     DrawFrame(ds, previewObject);
                 }
 
-
-                //CanvasRenderTarget? frameToRender = null;
-                //bool hasFrame;
-
-                //lock (_frameLock)
-                //{
-                //    hasFrame = _frameReady && _frameTarget != null;
-                //    if (hasFrame)
-                //    {
-                //        //CanvasBitmap? frameToRender = null;
-                //        //byte[] pixelData = _frameTarget.GetPixelBytes();    // GPU -> CPU -> GPU
-                //        //frameToRender = CanvasBitmap.CreateFromBytes(_device, pixelData, _videoWidth, _videoHeight, _frameTarget.Format);
-                //        frameToRender = _frameTarget;
-                //    }
-                //}
-
-                //if (!hasFrame || frameToRender == null)
-                //{
-                //    // ...
-                //    return;
-                //}
-
-                //// Calculate scale to fit video in the panel wihile maintaining aspect ratio
-                //var panelWidth = (float)_swapChainPanel.ActualWidth;
-                //var panelHeight = (float)_swapChainPanel.ActualHeight;
-                //var scaleX = panelWidth / _videoWidth;
-                //var scaleY = panelHeight / _videoHeight;
-                //var scale = Math.Min(scaleX, scaleY);
-
-                //// Centure the video
-                //var offsetX = (panelWidth - _videoWidth * scale) / 2;
-                //var offsetY = (panelHeight - _videoHeight * scale) / 2;
-                
-                //ds.Transform = Matrix3x2.CreateScale(scale, scale) * Matrix3x2.CreateTranslation(offsetX, offsetY);
-                //ds.DrawImage(frameToRender);
-
-                //// Reset transform for info overlay
-                //ds.Transform = Matrix3x2.Identity;
-
                 _swapChain.Present();
             }
             catch (Exception ex)
@@ -173,9 +131,20 @@ namespace DisplayHDRSample.RenderHelper
                 {
                     ds.DrawImage(videoFrame, destinationRect, sourceRect);
                 }
+
+                _frameTarget = videoFrame;
             }
         }
 
+        public CanvasRenderTarget GetFrameTarget()
+        {
+            return _frameTarget;
+        }
+
+        public CanvasDevice GetCanvasDevice()
+        {
+            return _devicePreview;
+        }
 
         public async Task OpenVideo()
         {
@@ -235,14 +204,6 @@ namespace DisplayHDRSample.RenderHelper
                 {
                     _mediaTimelineController.Start();
                 }
-            }
-        }
-
-        public void Pause()
-        {
-            if (_mediaTimelineController != null)
-            {
-                _mediaTimelineController.Pause();
             }
         }
 

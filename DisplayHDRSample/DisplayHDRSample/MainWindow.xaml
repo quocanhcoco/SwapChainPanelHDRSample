@@ -16,6 +16,10 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
         <StackPanel
             Grid.Row="0"
@@ -37,5 +41,13 @@
             BorderThickness="1">
             <canvas:CanvasSwapChainPanel x:Name="VideoPanel" />
         </Border>
+
+
+        <canvas:CanvasControl
+            x:Name="CanvasControlPreview"
+            Grid.Column="1"
+            Grid.RowSpan="3"
+            ClearColor="Transparent"
+            Draw="CanvasControlPreview_Draw" />
     </Grid>
 </Window>
