@@ -1,30 +1,35 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using DisplayHDRSample.PreviewObject;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading.Tasks;
+using Windows.Foundation;
+using Windows.Media;
 using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 
 namespace DisplayHDRSample.RenderHelper
 {
     public class VideoRenderer : IDisposable
     {
-        private CanvasDevice? _device;
+        private List<PreviewObjectVideo> _previewObjects;
+        private CanvasDevice? _devicePreview;
         private CanvasSwapChainPanel? _swapChainPanel;
         private CanvasSwapChain? _swapChain;
+
         private MediaPlayer? _mediaPlayer;
+        private MediaTimelineController? _mediaTimelineController;
 
-        private CanvasBitmap? _frameTarget;
+        private CanvasRenderTarget? _frameTarget;
         private bool _frameReady;
-
-        private int _videoWidth;
-        private int _videoHeight;
 
         private bool _isRendering;
         private DispatcherTimer? _renderTimer;
@@ -33,14 +38,17 @@ namespace DisplayHDRSample.RenderHelper
         public void Initialize(CanvasSwapChainPanel swapChainPanel)
         {
             _swapChainPanel = swapChainPanel;
-            _device = CanvasDevice.GetSharedDevice();
+            _devicePreview = new CanvasDevice();
+
+            _mediaTimelineController = new MediaTimelineController();
+            _previewObjects = new List<PreviewObjectVideo>();
 
             // Create swap chain with HDR pixel format (FP16 for HDR values)
             var format = HdrHelper.GetOptimalPixelFormat(isHdr: true);
             var width = Math.Max(1, (float)swapChainPanel.ActualWidth);
             var height = Math.Max(1, (float)swapChainPanel.ActualHeight);
 
-            _swapChain = new CanvasSwapChain(_device, width, height, 96, format, 2, CanvasAlphaMode.Premultiplied);
+            _swapChain = new CanvasSwapChain(_devicePreview, width, height, 96, format, 2, CanvasAlphaMode.Premultiplied);
 
             // Configure HDR color space on the swap chain
             HdrHelper.ConfigureHdrSwapChain(_swapChain, isHdr: true);
@@ -67,7 +75,7 @@ namespace DisplayHDRSample.RenderHelper
             if (_isRendering) return;
 
             _isRendering = true;
-            _renderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) }; // ~60 FPS
+            _renderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) }; // ~60 FPS
             _renderTimer.Tick += OnRenderTick;
             _renderTimer.Start();
         }
@@ -79,52 +87,92 @@ namespace DisplayHDRSample.RenderHelper
 
         private void RenderFrame()
         {
-            if (_swapChain == null || _device == null || _swapChainPanel == null) return;
+            if (_swapChain == null || _devicePreview == null || _swapChainPanel == null) return;
 
             try
             {
                 using var ds = _swapChain.CreateDrawingSession(Colors.Transparent);
 
-                CanvasBitmap? frameToRender = null;
-                bool hasFrame;
-
-                lock (_frameLock)
+                foreach (var previewObject in _previewObjects)
                 {
-                    hasFrame = _frameReady && _frameTarget != null;
-                    if (hasFrame)
-                    {
-                        frameToRender = _frameTarget;
-                    }
+                    DrawFrame(ds, previewObject);
                 }
 
-                if (!hasFrame || frameToRender == null)
-                {
-                    // ...
-                    return;
-                }
 
-                // Calculate scale to fit video in the panel wihile maintaining aspect ratio
-                var panelWidth = (float)_swapChainPanel.ActualWidth;
-                var panelHeight = (float)_swapChainPanel.ActualHeight;
-                var scaleX = panelWidth / _videoWidth;
-                var scaleY = panelHeight / _videoHeight;
-                var scale = Math.Min(scaleX, scaleY);
+                //CanvasRenderTarget? frameToRender = null;
+                //bool hasFrame;
 
-                // Centure the video
-                var offsetX = (panelWidth - _videoWidth * scale) / 2;
-                var offsetY = (panelHeight - _videoHeight * scale) / 2;
+                //lock (_frameLock)
+                //{
+                //    hasFrame = _frameReady && _frameTarget != null;
+                //    if (hasFrame)
+                //    {
+                //        //CanvasBitmap? frameToRender = null;
+                //        //byte[] pixelData = _frameTarget.GetPixelBytes();    // GPU -> CPU -> GPU
+                //        //frameToRender = CanvasBitmap.CreateFromBytes(_device, pixelData, _videoWidth, _videoHeight, _frameTarget.Format);
+                //        frameToRender = _frameTarget;
+                //    }
+                //}
+
+                //if (!hasFrame || frameToRender == null)
+                //{
+                //    // ...
+                //    return;
+                //}
+
+                //// Calculate scale to fit video in the panel wihile maintaining aspect ratio
+                //var panelWidth = (float)_swapChainPanel.ActualWidth;
+                //var panelHeight = (float)_swapChainPanel.ActualHeight;
+                //var scaleX = panelWidth / _videoWidth;
+                //var scaleY = panelHeight / _videoHeight;
+                //var scale = Math.Min(scaleX, scaleY);
+
+                //// Centure the video
+                //var offsetX = (panelWidth - _videoWidth * scale) / 2;
+                //var offsetY = (panelHeight - _videoHeight * scale) / 2;
                 
-                ds.Transform = Matrix3x2.CreateScale(scale, scale) * Matrix3x2.CreateTranslation(offsetX, offsetY);
-                ds.DrawImage(frameToRender);
+                //ds.Transform = Matrix3x2.CreateScale(scale, scale) * Matrix3x2.CreateTranslation(offsetX, offsetY);
+                //ds.DrawImage(frameToRender);
 
-                // Reset transform for info overlay
-                ds.Transform = Matrix3x2.Identity;
+                //// Reset transform for info overlay
+                //ds.Transform = Matrix3x2.Identity;
 
                 _swapChain.Present();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error during rendering: {ex.Message}");
+            }
+        }
+
+        private void DrawFrame(CanvasDrawingSession ds, PreviewObjectVideo previewObject)
+        {
+            if (previewObject == null || ds == null) return;
+
+            lock (_frameLock)
+            {
+                //if (previewObject.GetLastFrameBytes() is IBuffer bytesToDraw)
+                //{
+                //    int width = (int)previewObject.GetSourceRect().Width;
+                //    int height = (int)previewObject.GetSourceRect().Height;
+                //    using (CanvasBitmap frame = CanvasBitmap.CreateFromBytes(_devicePreview, bytesToDraw, width, height, HdrHelper.GetOptimalPixelFormat(isHdr: true)))
+                //    {
+                //        Rect destinationRect = previewObject.GetDestinationRect();
+                //        Rect sourceRect = previewObject.GetSourceRect();
+
+                //        ds.DrawImage(frame, destinationRect, sourceRect);
+                //    }
+                //}
+
+                var videoFrame = previewObject.GetCurrentFrame();
+
+                Rect destinationRect = previewObject.GetDestinationRect();
+                Rect sourceRect = previewObject.GetSourceRect();
+
+                if (videoFrame != null)
+                {
+                    ds.DrawImage(videoFrame, destinationRect, sourceRect);
+                }
             }
         }
 
@@ -153,90 +201,57 @@ namespace DisplayHDRSample.RenderHelper
 
         private void LoadVideoFile(StorageFile file)
         {
-            StopVideo();
+            if (_previewObjects == null || file == null || _mediaTimelineController == null) return;
+            PreviewObjectVideo videoObject = new PreviewObjectVideo(file , _mediaTimelineController, _devicePreview);
+            _previewObjects.Add(videoObject);
 
-            try
-            {
-                _mediaPlayer = new MediaPlayer();
-                _mediaPlayer.IsVideoFrameServerEnabled = true;
-
-                var source = MediaSource.CreateFromStorageFile(file);
-                var item = new MediaPlaybackItem(source);
-
-                _mediaPlayer.Source = item;
-                _mediaPlayer.AutoPlay = false;
-
-                // Subscribe to video frame available event
-                _mediaPlayer.VideoFrameAvailable += OnVideoFrameAvailable;
-
-                // Get video dimensions
-                _mediaPlayer.MediaOpened += (s, e) =>
-                {
-                    try
-                    {
-                        var playbackItem = s.Source as MediaPlaybackItem;
-                        if (playbackItem != null)
-                        {
-                            var tracks = playbackItem.VideoTracks;
-                            if (tracks.Count > 0)
-                            {
-                                var encoding = tracks[0].GetEncodingProperties();
-                                _videoHeight = (int)encoding.Height;
-                                _videoWidth = (int)encoding.Width;
-
-                                // Create frame target with video dimensions and HDR format
-                                EnsureFrameTarger();
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Error getting video dimensions: {ex.Message}");
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error loading video file: {ex.Message}");
-            }
+            UpdatePreviewObjectsPosion();
         }
 
-        private void EnsureFrameTarger()
+        private void UpdatePreviewObjectsPosion()
         {
-            if (_device == null || _videoWidth <= 0 || _videoHeight <= 0) return;
+            if (_previewObjects == null || _previewObjects.Count == 0 || _swapChain == null) return;
 
-            // Create render target to match video dimensions and HDR format
-            if (_frameTarget == null || _frameTarget.Size.Width != _videoWidth || _frameTarget.Size.Height != _videoHeight)
+            // Simple layout: horizontal row of videos at the top of the panel
+            var swapChainSize = _swapChain.Size;
+            var videoWidth = swapChainSize.Width / _previewObjects.Count;
+            var videoHeight = swapChainSize.Height / _previewObjects.Count;
+
+            for (int i = 0; i < _previewObjects.Count; i++)
             {
-                _frameTarget?.Dispose();
-                _frameTarget = new CanvasRenderTarget(_device, _videoWidth, _videoHeight, 96, HdrHelper.GetOptimalPixelFormat(isHdr: true), CanvasAlphaMode.Premultiplied);
+                _previewObjects[i].UpdateDestinationRect(new Rect(i * videoWidth, 0, videoWidth, videoHeight));
             }
         }
 
         public void Play()
         {
-            if (_mediaPlayer != null)
+            if (_mediaTimelineController != null)
             {
-                _mediaPlayer.Play();
+                if (_mediaTimelineController.State == MediaTimelineControllerState.Paused)
+                {
+                    _mediaTimelineController.Resume();
+                }
+                else
+                {
+                    _mediaTimelineController.Start();
+                }
             }
         }
 
         public void Pause()
         {
-            if ( _mediaPlayer != null)
+            if (_mediaTimelineController != null)
             {
-                _mediaPlayer.Pause();
+                _mediaTimelineController.Pause();
             }
         }
 
         public void StopVideo()
         {
-            if (_mediaPlayer != null)
+            if (_mediaTimelineController != null)
             {
-                _mediaPlayer.Pause();
-                _mediaPlayer.VideoFrameAvailable -= OnVideoFrameAvailable;
-                _mediaPlayer.Source = null;
-                _mediaPlayer = null;
+                _mediaTimelineController.Pause();
+                _mediaTimelineController = null;
             }
             lock (_frameLock)
             {
@@ -244,33 +259,6 @@ namespace DisplayHDRSample.RenderHelper
                 _frameTarget = null;
                 _frameReady = false;
             }
-        }
-
-        private void OnVideoFrameAvailable(MediaPlayer sender, object args)
-        {
-            lock (_frameLock)
-            {
-                try
-                {
-                    if (_frameTarget == null) return;
-                    sender.CopyFrameToVideoSurface(_frameTarget);
-                    _frameReady = true;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Error occurred while copying video frame: {ex.Message}");
-                }
-            }
-        }
-
-        public void Dispose()
-        {
-            StopRenderLoop();
-            StopVideo();
-
-            _swapChain?.Dispose();
-            _swapChain = null;
-            _device = null;
         }
 
         private void StopRenderLoop()
@@ -283,6 +271,16 @@ namespace DisplayHDRSample.RenderHelper
                 _renderTimer.Tick -= OnRenderTick;
                 _renderTimer = null;
             }
+        }
+
+        public void Dispose()
+        {
+            StopRenderLoop();
+            StopVideo();
+
+            _swapChain?.Dispose();
+            _swapChain = null;
+            _devicePreview = null;
         }
     }
 }

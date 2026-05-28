@@ -22,17 +22,13 @@
             Orientation="Horizontal"
             Spacing="20">
             <Button
-                x:Name="BtnOpenVideo"
-                Click="BtnOpenVideo_Click"
-                Content="Open Video" />
+                x:Name="BtnOpenVideo1"
+                Click="BtnOpenVideo1_Click"
+                Content="Open Video 1" />
             <Button
                 x:Name="BtnPlay"
                 Click="BtnPlay_Click"
                 Content="Play" />
-            <Button
-                x:Name="BtnPause"
-                Click="BtnPause_Click"
-                Content="Pause" />
         </StackPanel>
 
         <Border

@@ -26,7 +26,7 @@ namespace DisplayHDRSample
             _renderer?.Dispose();
         }
 
-        private void BtnOpenVideo_Click(object sender, RoutedEventArgs e)
+        private void BtnOpenVideo1_Click(object sender, RoutedEventArgs e)
         {
             _renderer?.OpenVideo();
         }
@@ -34,11 +34,6 @@ namespace DisplayHDRSample
         private void BtnPlay_Click(object sender, RoutedEventArgs e)
         {
             _renderer?.Play();
-        }
-
-        private void BtnPause_Click(object sender, RoutedEventArgs e)
-        {
-            _renderer?.Pause();
         }
     }
 }
