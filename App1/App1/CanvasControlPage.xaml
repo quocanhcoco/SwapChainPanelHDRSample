@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="App1.CanvasControlPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:App1"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    xmlns:Win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    Unloaded="Page_Unloaded">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <Button
+            x:Name="LoadImageButton"
+            Click="LoadImageButton_Click"
+            Content="Load Image" />
+        </StackPanel>
+
+        <Border
+            Grid.Row="1">
+            <Win2d:CanvasControl
+                x:Name="myCanvas"
+                Draw="myCanvas_Draw"
+                CreateResources="myCanvas_CreateResources"
+                ClearColor="Transparent" />
+        </Border>
+    </Grid>
+</Page>

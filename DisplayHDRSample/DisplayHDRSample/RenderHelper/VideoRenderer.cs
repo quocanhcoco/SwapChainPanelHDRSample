@@ -176,7 +176,7 @@ namespace DisplayHDRSample.RenderHelper
             }
         }
 
-
+        int countHDR = 0;
         public async Task OpenVideo()
         {
             try
@@ -191,7 +191,8 @@ namespace DisplayHDRSample.RenderHelper
                 var file = await picker.PickSingleFileAsync();
                 if (file == null) return;
 
-                LoadVideoFile(file);
+                LoadVideoFile(file, countHDR);
+                countHDR++;
             }
             catch (Exception ex)
             {
@@ -199,10 +200,11 @@ namespace DisplayHDRSample.RenderHelper
             }
         }
 
-        private void LoadVideoFile(StorageFile file)
+        private void LoadVideoFile(StorageFile file, int count)
         {
+            bool isHDR = (count % 2 == 0);
             if (_previewObjects == null || file == null || _mediaTimelineController == null) return;
-            PreviewObjectVideo videoObject = new PreviewObjectVideo(file , _mediaTimelineController, _devicePreview);
+            PreviewObjectVideo videoObject = new PreviewObjectVideo(file , _mediaTimelineController, _devicePreview, isHDR);
             _previewObjects.Add(videoObject);
 
             UpdatePreviewObjectsPosion();

@@ -28,10 +28,13 @@ namespace DisplayHDRSample.PreviewObject
         private int _videoWidth;
         private int _videoHeight;
 
-        public PreviewObjectVideo(StorageFile file, MediaTimelineController mediaTimelineController, CanvasDevice canvasDevice)
+        private bool _isHDR;
+
+        public PreviewObjectVideo(StorageFile file, MediaTimelineController mediaTimelineController, CanvasDevice canvasDevice, bool isHDR)
         {
             _device = canvasDevice;
             _mediaTimelineController = mediaTimelineController;
+            _isHDR = isHDR;
             LoadVideoFile(file);
         }
 
